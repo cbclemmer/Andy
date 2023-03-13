@@ -201,5 +201,5 @@ class Muse(Chat):
         self.reset()
         self._messages[0] = { 'role': 'system', 'content': log }
         print('Last conversation loaded...')
-        return self.send_chat('Outline the current conversation', log)
+        return self.send_chat('Summarize the current conversation, be short and concise', log)
         

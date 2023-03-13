@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
     # save whatever is in the chat log when key interrupt
     def keyboardInterruptHandler(_, __):
-        if len(muse._messages) > 1:
+        if len(muse._messages) > 2:
             print("Conversation saved")
         muse.save_messages()
         exit(0)
@@ -104,7 +104,7 @@ if __name__ == '__main__':
             continue
         if user_input == 'LOAD':
             [_, _, msg] = muse.load()
-            print('Context: ' + msg)
+            print('Context:\n ' + msg)
             continue
         [anticipation, salient_points, msg_res] = muse.send_chat(user_input)
         print('\n\nANTICIPATION: %s' % anticipation)

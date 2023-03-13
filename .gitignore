@@ -5,3 +5,4 @@ chat_logs/*
 chunk_summaries/*
 kg_topics/*
 gpt3_logs/*
+__pycache__/
