@@ -7,6 +7,7 @@ import re
 from time import time,sleep
 from uuid import uuid4
 import datetime
+from lib import Muse
 
 
 def open_file(filepath):
@@ -90,10 +91,10 @@ def flatten_convo(conversation):
 
 if __name__ == '__main__':
     convo_length = 30
-    openai.api_key = open_file('key_openai.txt')
-    default_system = 'I am an AI named Muse. My primary goal is to help the user plan, brainstorm, outline, and otherwise construct their work of fiction.'
-    conversation = list()
-    conversation.append({'role': 'system', 'content': default_system})
+    api_key = open_file('key_openai.txt')
+    org_key = open_file('key_org.txt')
+    muse = Muse(api_key, org_key)
+    
     counter = 0
     while True:
         # get user input, save to file
