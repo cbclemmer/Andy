@@ -1,19 +1,14 @@
 import os
 import openai
 import json
-import numpy as np
-from numpy.linalg import norm
-import re
 from time import time,sleep
-from uuid import uuid4
 import datetime
 from lib import Muse
-
+import signal
 
 def open_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as infile:
         return infile.read()
-
 
 def save_file(filepath, content):
     with open(filepath, 'w', encoding='utf-8') as outfile:
@@ -88,41 +83,23 @@ def flatten_convo(conversation):
         convo += '%s: %s\n' % (i['role'].upper(), i['content'])
     return convo.strip()
 
-
 if __name__ == '__main__':
     convo_length = 30
     api_key = open_file('key_openai.txt')
     org_key = open_file('key_org.txt')
     muse = Muse(api_key, org_key)
+
+    # save whatever is in the chat log when key interrupt
+    def keyboardInterruptHandler(_, __):
+        if len(muse._messages) > 1:
+            print("Conversation saved")
+        muse.save_messages()
+        exit(0)
+    signal.signal(signal.SIGINT, keyboardInterruptHandler)
     
-    counter = 0
     while True:
-        # get user input, save to file
-        a = input('\n\nUSER: ')
-        conversation.append({'role': 'user', 'content': a})
-        filename = 'chat_%s_user.txt' % time()
-        if not os.path.exists('chat_logs'):
-            os.makedirs('chat_logs')
-        save_file('chat_logs/%s' % filename, a)
-        flat = flatten_convo(conversation)
-        #print(flat)
-        # infer user intent, disposition, valence, needs
-        prompt = open_file('prompt_anticipate.txt').replace('<<INPUT>>', flat)
-        anticipation = gpt3_completion(prompt)
+        user_input = input('\n\nUSER: ')
+        [anticipation, salient_points, msg_res] = muse.send_chat(user_input)
         print('\n\nANTICIPATION: %s' % anticipation)
-        # summarize the conversation to the most salient points
-        prompt = open_file('prompt_salience.txt').replace('<<INPUT>>', flat)
-        salience = gpt3_completion(prompt)
-        print('\n\nSALIENCE: %s' % salience)
-        # update SYSTEM based upon user needs and salience
-        conversation[0]['content'] = default_system + ''' Here's a brief summary of the conversation: %s - And here's what I expect the user's needs are: %s''' % (salience, anticipation)
-        # generate a response
-        response = chatgpt_completion(conversation)
-        conversation.append({'role': 'assistant', 'content': response})
-        print('\n\nMUSE: %s' % response)
-        # increment counter and consolidate memories
-        counter += 2
-        if counter >= 10:
-            # reset conversation
-            conversation = list()
-            conversation.append({'role': 'system', 'content': default_system})
+        print('\n\nSALIENCE: %s' % salient_points)
+        print('\n\nMUSE: %s' % msg_res)

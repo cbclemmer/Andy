@@ -1,7 +1,7 @@
 import requests
 import tiktoken
 import os
-from time import time,sleep
+from time import time
 
 class GptCompletion:
     def __init__(self, api_key, org, model) -> None:
@@ -139,11 +139,18 @@ class Muse(Chat):
 
     def send_chat(self, msg):
         system_prompt = self._default_system_msg
-        
+        anticipation = ''
+        salient_points = ''
+
         # if there has already been at least one message sent
         if len(self._messages) > 1:
+            # infer user intent, disposition, valence, needs
             anticipation = self._anticipation.anticipate(self._messages)
+            
+            # summarize the conversation to the most salient points
             salient_points = self._salience.get_salient_points(self._messages)
+            
+            # update SYSTEM based upon user needs and salience
             system_prompt += '\nHere\'s a brief summary of the conversation:\n %s \n- And here\'s what I expect the user\'s needs are:\n%s' % (salient_points, anticipation)
         
         self._messages[0]['content'] = system_prompt
@@ -151,14 +158,23 @@ class Muse(Chat):
         # not a perfect calculation but close enough
         conversation_tokens = len(self._encoding.encode(stringify_conversation(self._messages + [msg])))
         
+        # reset conversation and save conversation
         if conversation_tokens + self._max_chat_length > self._max_tokens:
             self.save_messages()
             self._messages.clear()
             self._messages.append(system_prompt)
 
-        return self.send(msg)
-        
+        # generate a response
+        msg_res = self.send(msg)
+        return [anticipation, salient_points, msg_res]
+    
+    def reset(self):
+        self.save_messages()
+        self._messages[0] = self._default_system_msg
+
     def save_messages(self):
+        if len(self._messages) < 2:
+            return # bail if theres nothing to save
         filename = 'chat_%s_user.txt' % time()
         if not os.path.exists('chat_logs'):
             os.makedirs('chat_logs')
