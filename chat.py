@@ -103,7 +103,8 @@ if __name__ == '__main__':
             muse.reset()
             continue
         if user_input == 'LOAD':
-            muse.load()
+            [_, _, msg] = muse.load()
+            print('Context: ' + msg)
             continue
         [anticipation, salient_points, msg_res] = muse.send_chat(user_input)
         print('\n\nANTICIPATION: %s' % anticipation)

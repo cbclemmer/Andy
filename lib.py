@@ -33,7 +33,7 @@ class GptCompletion:
         self.completion_tokens += res.get('usage').get('completion_tokens')
         self.total_tokens += res.get('usage').get('total_tokens')
         msg = res.get('choices')[0].get('text')
-        return (res, msg)
+        return msg
 
 class Chat:
     def __init__(
@@ -52,6 +52,9 @@ class Chat:
         # total tokens of the conversation updated every chat message
         self._total_tokens = 0
         self._messages = []
+
+    def add_message(self, msg, role):
+        self._messages.append({ 'role': role, 'content': msg})
     
     def send(self, msg, role="user"):
         if self.api_key is None or \
@@ -59,7 +62,7 @@ class Chat:
             self.model is None:
             raise AssertionError("API key, org, or model is not defined")
 
-        self._messages.append({ "role": role, "content": msg })
+        self.add_message(msg, role)
         return self.run()
 
     def run(self):
@@ -98,13 +101,13 @@ def stringify_conversation(conversation):
 
 completion_config = {
     'temperature': 0,
-    'tokens': 400,
+    'max_tokens': 400,
     'stop': ['USER:', 'RAVEN:']
 }
 
 class Anticipation(GptCompletion):
     def __init__(self, api_key, org_key):
-        super(GptCompletion, self).__init__(api_key, org_key, 'text-davinci-003')
+        super().__init__(api_key, org_key, 'text-davinci-003')
         self._anticipation_prompt = open_file('prompts/prompt_anticipate.txt')
         self._prompt_tokens = len(self._encoding.encode(self._anticipation_prompt))
 
@@ -115,7 +118,7 @@ class Anticipation(GptCompletion):
 
 class Salience(GptCompletion):
     def __init__(self, api_key, org_key):
-        super(GptCompletion, self).__init__(api_key, org_key, 'text-davinci-003')
+        super().__init__(api_key, org_key, 'text-davinci-003')
         self._salience_prompt = open_file('prompts/prompt_salience.txt')
         self._prompt_tokens = len(self._encoding.encode(self._salience_prompt))
 
@@ -126,19 +129,19 @@ class Salience(GptCompletion):
 
 class Muse(Chat):
     def __init__(self, api_key, org_key, max_tokens = 4096, max_chat_length = 512):
-        super(Chat, self).__init__(api_key, org_key, 'gpt-3.5-turbo', {
+        super().__init__(api_key, org_key, 'gpt-3.5-turbo', {
             "max_tokens": max_chat_length
         })
         self._max_tokens = max_tokens
         self._max_chat_length = max_chat_length
-        self._anticipation = Anticipation(api_key, org_key, 'text-davinci-003')
-        self._salience = Salience(api_key, org_key, 'text-davinci-003')
+        self._anticipation = Anticipation(api_key, org_key)
+        self._salience = Salience(api_key, org_key)
         self._default_system_msg = open_file('prompts/prompt_system_default.txt')
 
-        self._messages.append({ 'role': 'system', 'content': self._default_system_msg})
+        self.add_message(self._default_system_msg, 'system')
 
-    def send_chat(self, msg):
-        system_prompt = self._default_system_msg
+    def send_chat(self, msg, sys_msg = None):
+        system_prompt = self._default_system_msg if sys_msg == None else sys_msg
         anticipation = ''
         salient_points = ''
 
@@ -156,13 +159,13 @@ class Muse(Chat):
         self._messages[0]['content'] = system_prompt
 
         # not a perfect calculation but close enough
-        conversation_tokens = len(self._encoding.encode(stringify_conversation(self._messages + [msg])))
+        conversation_tokens = len(self._encoding.encode(stringify_conversation(self._messages + [{ 'role': 'user', 'content': msg }])))
         
         # reset conversation and save conversation
         if conversation_tokens + self._max_chat_length > self._max_tokens:
             self.save_messages()
             self._messages.clear()
-            self._messages.append(system_prompt)
+            self.add_message(system_prompt, 'system')
 
         # generate a response
         msg_res = self.send(msg)
@@ -187,13 +190,16 @@ class Muse(Chat):
         
         logs = []
         for l in os.listdir('chat_logs'):
-            edit_time = os.path.getmtime('chat_logs' + l)
-            logs.append(l, edit_time)
+            edit_time = os.path.getmtime('chat_logs/' + l)
+            logs.append((l, edit_time))
         
         def sort_logs(l):
             return l[1]
         logs.sort(key=sort_logs, reverse=True)
-        log = logs[0].split('user:')[0]
+        log = logs[0][0]
+        log = open_file('chat_logs/' + log).split('USER:')[0]
         self.reset()
-        self._messages[0] = log
+        self._messages[0] = { 'role': 'system', 'content': log }
+        print('Last conversation loaded...')
+        return self.send_chat('Outline the current conversation', log)
         
