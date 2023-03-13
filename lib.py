@@ -180,3 +180,20 @@ class Muse(Chat):
             os.makedirs('chat_logs')
         conv = stringify_conversation(self._messages)
         save_file('chat_logs/%s' % filename, conv)
+
+    def load(self):
+        if not os.path.exists('chat_logs'):
+            print('Error: there are no chat logs to load')
+        
+        logs = []
+        for l in os.listdir('chat_logs'):
+            edit_time = os.path.getmtime('chat_logs' + l)
+            logs.append(l, edit_time)
+        
+        def sort_logs(l):
+            return l[1]
+        logs.sort(key=sort_logs, reverse=True)
+        log = logs[0].split('user:')[0]
+        self.reset()
+        self._messages[0] = log
+        

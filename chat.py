@@ -99,6 +99,12 @@ if __name__ == '__main__':
     
     while True:
         user_input = input('\n\nUSER: ')
+        if user_input == 'RESET':
+            muse.reset()
+            continue
+        if user_input == 'LOAD':
+            muse.load()
+            continue
         [anticipation, salient_points, msg_res] = muse.send_chat(user_input)
         print('\n\nANTICIPATION: %s' % anticipation)
         print('\n\nSALIENCE: %s' % salient_points)
