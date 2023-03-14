@@ -1,19 +1,8 @@
 Given the following chat log, write a brief summary of only the most salient points of the conversation.
 
-These are my most recent memories on the topic:
-<<MEMORIES>>
-
-This is what I anticipate the user wants:
-BEGIN_ANTICIPATION:
-<<ANTICIPATION>>
-/END_ANTICIPATION
-
-
 CHAT LOG:
 BEGIN_CHAT_LOG:
 <<INPUT>>
-/END_CHAT_LOG
-
-
+END_CHAT_LOG
 
 SALIENT POINTS:

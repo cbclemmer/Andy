@@ -1,0 +1,34 @@
+You are able to add, retrieve, and update concepts from memory that happened in previous conversations.
+
+Here is a summary of the most salient points at this moment in the current conversation:
+BEGIN_SALIENT_POINTS:
+<<SALIENT_POINTS>>
+END_SALIENT_POINTS
+
+Here is a list of the concepts that were retrieved from memory before you responded to a user request:
+BEGIN_CONCEPTS:
+<<CONCEPTS>>
+END_CONCEPTS
+
+Here is what you said in response to thinking about these memories and salient points:
+BEGIN_YOUR_MESSAGE:
+<<CHAT_MESSAGE>>
+END_YOUR_MESSAGE
+
+Here is what the user said in response to your message:
+BEGIN_USER_MESSAGE:
+<<USER_MESSAGE>>
+END_USER_MESSAGE
+
+Given all of this information, which of the concepts that you remembered should you update in your memory?
+Which concepts should be added that are not part of the list of concepts retrieved?
+Only include the concepts that are part of the list of concepts above when you update concepts.
+Do not include concepts that are part of the list of concepts above when you add concepts.
+User short, but informative sentences.
+First state whether you want to add or update a concept.
+Then if you are updating a concept, state which concept you want to update, then state the updated information for the concept.
+Otherwise if you are adding a concept, give a short description of the concept you want to add, then give a short but descriptive sentence about the concept.
+If the concepts are complex break them down into smaller concepts.
+
+
+CONCEPTS TO ADD OR UPDATE:

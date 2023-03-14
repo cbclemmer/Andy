@@ -1,0 +1,24 @@
+Here's a brief summary of the conversation:
+
+
+BEGIN_SUMMARY:
+<<CONVERSATION>> 
+END_SUMMARY
+
+
+And here's what I anticipate the user's needs are:
+BEGIN_ANTICIPATION:
+<<ANTICIPATION>>
+END_ANTICIPATION
+
+
+These are my most recent and most related memories for what my next message in the conversation should be:
+BEGIN_MEMORIES:
+<<MEMORIES>>
+END_MEMORIES
+
+
+These are the concepts that are most related to what my next message in the conversation should be:
+BEGIN_CONCEPTS:
+<<CONCEPTS>>
+END_CONCEPTS

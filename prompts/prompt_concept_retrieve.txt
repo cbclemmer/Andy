@@ -1,0 +1,12 @@
+You are able to retrieve concepts from memory that happened from previous conversations. 
+Given a summary of the most salient points at this moment in a conversation, determine which concepts that you want to remember.
+Use short, but informative sentences.
+Put your requests in a list.
+
+
+BEGIN_SALIENT_POINTS:
+<<INPUT>>
+END_SALIENT_POINTS
+
+
+Concepts to remember:

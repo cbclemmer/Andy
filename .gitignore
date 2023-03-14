@@ -6,3 +6,5 @@ chunk_summaries/*
 kg_topics/*
 gpt3_logs/*
 __pycache__/
+embeddings/
+concepts/
