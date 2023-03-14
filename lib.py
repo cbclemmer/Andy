@@ -1,7 +1,9 @@
 import requests
 import tiktoken
 import os
+import json
 from time import time
+from openai.embeddings_utils import cosine_similarity
 
 class GptCompletion:
     def __init__(self, api_key, org, model) -> None:
@@ -85,6 +87,28 @@ class Chat:
         self._messages.append(choice)
         return choice.get('content')
 
+class EmbeddingFactory:
+    def __init__(self, api_key, org_key):
+        self.api_key = api_key
+        self.org_key = org_key
+
+    def get_embedding(self, data):
+        d = {
+            "model": 'text-embedding-ada-002',
+            "input": json.dumps(data)
+        }
+        res = requests.post('https://api.openai.com/v1/embeddings', 
+            headers={
+                'Authorization': 'Bearer ' + self.api_key,
+                'OpenAI-Organization': self.org_key
+            },
+            json=d
+        ).json()
+        if res.get('error') is not None:
+            raise SyntaxError("Error getting embedding: " + res.get('error').get('message'))
+        return res.get('data')[0].get('embedding')
+
+
 def open_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as infile:
         return infile.read()
@@ -122,10 +146,35 @@ class Salience(GptCompletion):
         self._salience_prompt = open_file('prompts/prompt_salience.txt')
         self._prompt_tokens = len(self._encoding.encode(self._salience_prompt))
 
-    def get_salient_points(self, conversation):
+    def get_salient_points(self, conversation, anticipation, memories):
         conv_s = stringify_conversation(conversation)
-        prompt = self._salience_prompt.replace('<<INPUT>>', conv_s)
+        prompt = self._salience_prompt\
+            .replace('<<INPUT>>', conv_s)\
+            .replace('<<ANTICIPATION>>', anticipation)\
+            .replace('<<MEMORIES>>', memories)
+
+        print('SAL')
+        print(prompt)
+        print('\nSAL')
         return self.complete(prompt, completion_config)
+
+class Memory(EmbeddingFactory):
+    def __init__(self, api_key, org_key):
+        super().__init__(api_key, org_key)
+
+    def get_memories(self, query, top_n=3):
+        q_embed = self.get_embedding(query)
+        most_similar = [ ]
+        for e_file in os.listdir('embeddings'):
+            embed_obj = json.loads(open_file('embeddings/' + e_file))
+            embed_dat = embed_obj['embedding']
+            similarity = cosine_similarity(q_embed, embed_dat)
+            most_similar.append((similarity, embed_obj))
+            def sort_objs(o):
+                return o[0]
+            most_similar.sort(key=sort_objs)
+            most_similar = most_similar[:top_n]
+        return most_similar
 
 class Muse(Chat):
     def __init__(self, api_key, org_key, max_tokens = 4096, max_chat_length = 512):
@@ -136,11 +185,15 @@ class Muse(Chat):
         self._max_chat_length = max_chat_length
         self._anticipation = Anticipation(api_key, org_key)
         self._salience = Salience(api_key, org_key)
+        self.embedFactory = EmbeddingFactory(api_key, org_key)
+        self.memories = Memory(api_key, org_key)
+        self.embeddings = []
         self._default_system_msg = open_file('prompts/prompt_system_default.txt')
 
         self.add_message(self._default_system_msg, 'system')
 
     def send_chat(self, msg, sys_msg = None):
+        self.add_message(msg, 'user')
         system_prompt = self._default_system_msg if sys_msg == None else sys_msg
         anticipation = ''
         salient_points = ''
@@ -149,9 +202,14 @@ class Muse(Chat):
         if len(self._messages) > 1:
             # infer user intent, disposition, valence, needs
             anticipation = self._anticipation.anticipate(self._messages)
+
+            memories = self.memories.get_memories(self._messages[0]['content'] + '\nUSER:' + msg)
+            mem_list = ''
+            for mem in memories:
+                mem_list += '\n- ' + mem[1]['salient_points']
             
             # summarize the conversation to the most salient points
-            salient_points = self._salience.get_salient_points(self._messages)
+            salient_points = self._salience.get_salient_points(self._messages, anticipation, mem_list)
             
             # update SYSTEM based upon user needs and salience
             system_prompt += '\nHere\'s a brief summary of the conversation:\n %s \n- And here\'s what I expect the user\'s needs are:\n%s' % (salient_points, anticipation)
@@ -168,7 +226,19 @@ class Muse(Chat):
             self.add_message(system_prompt, 'system')
 
         # generate a response
-        msg_res = self.send(msg)
+        msg_res = self.run()
+
+        embed_object = {
+            'time': str(time()),
+            'anticipation': anticipation,
+            'salient_points': salient_points,
+            'message': msg,
+            'response': msg_res
+        }
+        embedding = self.embedFactory.get_embedding(json.dumps(embed_object))
+        embed_object['embedding'] = embedding
+        self.embeddings.append(embed_object)
+
         return [anticipation, salient_points, msg_res]
     
     def reset(self):
@@ -176,13 +246,23 @@ class Muse(Chat):
         self._messages[0] = self._default_system_msg
 
     def save_messages(self):
+        t = time()
         if len(self._messages) < 2:
             return # bail if theres nothing to save
-        filename = 'chat_%s_user.txt' % time()
+        filename = 'chat_%s_user.txt' % t
         if not os.path.exists('chat_logs'):
             os.makedirs('chat_logs')
         conv = stringify_conversation(self._messages)
         save_file('chat_logs/%s' % filename, conv)
+
+        if not os.path.exists('embeddings'):
+            os.makedirs('embeddings')
+        emb_str = ''
+        for emb in self.embeddings:
+            emb_str += json.dumps(emb) + ',\n'
+        emb_str = emb_str[:len(emb_str)-2]
+        filename = 'embedding_%s.json' % t
+        save_file('embeddings/%s' % filename, emb_str)
 
     def load(self):
         if not os.path.exists('chat_logs'):

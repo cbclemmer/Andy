@@ -85,8 +85,8 @@ def flatten_convo(conversation):
 
 if __name__ == '__main__':
     convo_length = 30
-    api_key = open_file('key_openai.txt')
-    org_key = open_file('key_org.txt')
+    api_key = open_file('key_openai.txt').split('\n')[0]
+    org_key = open_file('key_org.txt').split('\n')[0]
     muse = Muse(api_key, org_key)
 
     # save whatever is in the chat log when key interrupt
@@ -106,6 +106,7 @@ if __name__ == '__main__':
             [_, _, msg] = muse.load()
             print('Context:\n ' + msg)
             continue
+        print('Sending message...')
         [anticipation, salient_points, msg_res] = muse.send_chat(user_input)
         print('\n\nANTICIPATION: %s' % anticipation)
         print('\n\nSALIENCE: %s' % salient_points)
