@@ -166,14 +166,16 @@ class Memory(EmbeddingFactory):
         q_embed = self.get_embedding(query)
         most_similar = [ ]
         for e_file in os.listdir('embeddings'):
-            embed_obj = json.loads(open_file('embeddings/' + e_file))
-            embed_dat = embed_obj['embedding']
-            similarity = cosine_similarity(q_embed, embed_dat)
-            most_similar.append((similarity, embed_obj))
-            def sort_objs(o):
-                return o[0]
-            most_similar.sort(key=sort_objs)
-            most_similar = most_similar[:top_n]
+            e_file_data = json.loads(open_file('embeddings/' + e_file))
+            for line in e_file_data.split('\n'):
+                embed_obj = json.loads(line)
+                embed_dat = embed_obj['embedding']
+                similarity = cosine_similarity(q_embed, embed_dat)
+                most_similar.append((similarity, embed_obj))
+                def sort_objs(o):
+                    return o[0]
+                most_similar.sort(key=sort_objs)
+                most_similar = most_similar[:top_n]
         return most_similar
 
 class Muse(Chat):
@@ -261,7 +263,7 @@ class Muse(Chat):
         for emb in self.embeddings:
             emb_str += json.dumps(emb) + ',\n'
         emb_str = emb_str[:len(emb_str)-2]
-        filename = 'embedding_%s.json' % t
+        filename = 'embedding_%s.jsonl' % t
         save_file('embeddings/%s' % filename, emb_str)
 
     def load(self):
