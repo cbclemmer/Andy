@@ -133,7 +133,7 @@ def stringify_conversation(conversation):
         convo += '%s: %s\n' % (i['role'].upper(), i['content'])
     return convo.strip()
 
-def get_closest_embeddings(folder, q_embed, top_n):
+def get_closest_embeddings(folder, q_embed, top_n, exclude=[], exclude_key=None):
     if not os.path.exists(folder):
         return []
     most_similar = []
@@ -143,13 +143,16 @@ def get_closest_embeddings(folder, q_embed, top_n):
             continue
         for line in e_file_data.split('\n'):
             embed_obj = json.loads(line)
+            if exclude_key is not None:
+                if embed_obj[exclude_key] in exclude:
+                    continue
             embed_dat = embed_obj['embedding']
             similarity = cosine_similarity(q_embed, embed_dat)
             embed_obj['file_name'] = e_file
             most_similar.append((similarity, embed_obj))
             def sort_objs(o):
                 return o[0]
-            most_similar.sort(key=sort_objs)
+            most_similar.sort(key=sort_objs, reverse=True)
             most_similar = most_similar[:top_n]
     return most_similar
 
@@ -216,12 +219,15 @@ class Concept(GptCompletion):
         prompt = self._retrieve_prompt.replace('<<INPUT>>', salient_points)
         concept_keys = self.complete(prompt, completion_config).split('\n')
         concepts = ''
+        concept_list = []
         for c in concept_keys:
+            print('Attempting to retrieve concept: ' + c)
             q_embed = self.embeddingFactory.get_embedding(c)
-            most_similar = get_closest_embeddings('concepts', q_embed, 1)
+            most_similar = get_closest_embeddings('concepts', q_embed, 1, concept_list, 'data')
             if len(most_similar) == 0:
                 continue
-            concepts += '\n- ' + concepts['data']
+            concept_list.append(most_similar[0][1]['data'])
+            concepts += '\n- ' + most_similar[0][1]['data']
         return concepts
     
     def update_concepts(self, salient_points, retrieved_concepts, bot_message, user_message):
@@ -236,12 +242,14 @@ class Concept(GptCompletion):
         for c in concepts_to_update:
             c_embed_o = self.embed_concept(c)
             if 'add' in c.lower():
+                c_embed_o['data'] = c_embed_o['data'].replace('Add', '')
                 add_concepts.append(c_embed_o)
             if 'update' in c.lower():
+                c_embed_o['data'] = c_embed_o['data'].replace('Update', '')
                 c_to_update = get_closest_embeddings('concepts', c_embed_o['embedding'], 1)
                 if len(c_to_update) == 0:
                     continue
-                c_embed_o['file_name'] = c_to_update[0]['file_name']
+                c_embed_o['file_name'] = c_to_update[0][1]['file_name']
                 update_concepts.append(c_embed_o)
         return {
             'add': add_concepts,
@@ -414,9 +422,8 @@ class Muse(Chat):
         logs.sort(key=sort_logs, reverse=True)
         log = logs[0][0]
         log = open_file('chat_logs/' + log).split('USER:')[0]
-        self.reset()
         self._messages[0] = { 'role': 'system', 'content': log }
         print('Last conversation loaded...')
-        return self.run()
+        return self.send('What were we doing?')
         # return self.send_chat('Summarize the current conversation, be short and concise', log)
         
