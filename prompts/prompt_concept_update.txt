@@ -1,5 +1,6 @@
 You are able to add, retrieve, and update concepts from memory that happened in previous conversations.
 
+
 Here is a summary of the most salient points at this moment in the current conversation:
 BEGIN_SALIENT_POINTS:
 <<SALIENT_POINTS>>
@@ -29,6 +30,7 @@ First state whether you want to add or update a concept.
 Then if you are updating a concept, state which concept you want to update, then state the updated information for the concept.
 Otherwise if you are adding a concept, give a short description of the concept you want to add, then give a short but descriptive sentence about the concept.
 If the concepts are complex break them down into smaller concepts.
+Do not add or update concepts that you already know, only concepts that are learned from this conversation.
 
 
 CONCEPTS TO ADD OR UPDATE:

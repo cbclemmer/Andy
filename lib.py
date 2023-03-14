@@ -31,10 +31,13 @@ class GptCompletion:
             json = defaultConfig
         ).json()
         if res.get('error') is not None:
+            if 'overloaded' in res.get('error').get('message'):
+                print('ERROR: Server overloaded. Retrying request...')
+                self.complete(self, prompt, config)
             raise SyntaxError("error getting chat message: " + res.get('error').get('message'))
-        self.prompt_tokens += res.get('usage').get('prompt_tokens')
-        self.completion_tokens += res.get('usage').get('completion_tokens')
-        self.total_tokens += res.get('usage').get('total_tokens')
+        # self.prompt_tokens += res.get('usage').get('prompt_tokens')
+        # self.completion_tokens += res.get('usage').get('completion_tokens')
+        # self.total_tokens += res.get('usage').get('total_tokens')
         msg = res.get('choices')[0].get('text')
         return msg
 
@@ -82,6 +85,9 @@ class Chat:
             json = cfg
         ).json()
         if res.get('error') is not None:
+            if 'overloaded' in res.get('error').get('message'):
+                print('ERROR: Server overloaded. Retrying request...')
+                self.run(self)
             raise SyntaxError("error getting chat message: " + res.get('error').get('message'))
         self._total_tokens = res.get('usage').get('total_tokens')
         choice = res.get('choices')[0].get('message')
@@ -106,6 +112,9 @@ class EmbeddingFactory:
             json=d
         ).json()
         if res.get('error') is not None:
+            if 'overloaded' in res.get('error').get('message'):
+                print('ERROR: Server overloaded. Retrying request...')
+                self.get_embedding(self, data)
             raise SyntaxError("Error getting embedding: " + res.get('error').get('message'))
         return res.get('data')[0].get('embedding')
 
@@ -125,8 +134,13 @@ def stringify_conversation(conversation):
     return convo.strip()
 
 def get_closest_embeddings(folder, q_embed, top_n):
+    if not os.path.exists(folder):
+        return []
+    most_similar = []
     for e_file in os.listdir(folder):
-        e_file_data = json.loads(open_file(folder + '/' + e_file))
+        e_file_data = open_file(folder + '/' + e_file)
+        if e_file_data == '':
+            continue
         for line in e_file_data.split('\n'):
             embed_obj = json.loads(line)
             embed_dat = embed_obj['embedding']
@@ -176,7 +190,7 @@ class Memory(EmbeddingFactory):
         most_similar = get_closest_embeddings('embeddings', q_embed, top_n)
         memories = ''
         for o in most_similar:
-            memories += '\n- ' + o['salient_points']
+            memories += '\n- ' + o[1]['salient_points']
         return memories
 
 class Summary(GptCompletion):
@@ -195,7 +209,7 @@ class Concept(GptCompletion):
     def __init__(self, api_key, org_key):
         super().__init__(api_key, org_key, 'text-davinci-003')
         self.embeddingFactory = EmbeddingFactory(api_key, org_key)
-        self._retrieve_prompt = open_file('prompts/prompt_concept_retieve.txt')
+        self._retrieve_prompt = open_file('prompts/prompt_concept_retrieve.txt')
         self._update_prompt = open_file('prompts/prompt_concept_update.txt')
 
     def retrieve_concepts(self, salient_points):
@@ -225,7 +239,9 @@ class Concept(GptCompletion):
                 add_concepts.append(c_embed_o)
             if 'update' in c.lower():
                 c_to_update = get_closest_embeddings('concepts', c_embed_o['embedding'], 1)
-                c_embed_o['file_name'] = c_to_update['file_name']
+                if len(c_to_update) == 0:
+                    continue
+                c_embed_o['file_name'] = c_to_update[0]['file_name']
                 update_concepts.append(c_embed_o)
         return {
             'add': add_concepts,
@@ -272,13 +288,17 @@ class Muse(Chat):
         # if there has already been at least one message sent
         if len(self._messages) > 1:
             # infer user intent, disposition, valence, needs
+            print('Anticipating User needs...')
             anticipation = self._anticipation.anticipate(self._messages)
 
+            print('Retrieving relevant memories...')
             memories = self.memories.get_memories(self._messages[0]['content'] + '\nUSER:' + msg)
             
             # summarize the conversation to the most salient points
+            print('Summarizing salient points of conversation...')
             salient_points = self._salience.get_salient_points(self._messages)
 
+            print('Retrieving relevant concepts...')
             concepts = self.concepts.retrieve_concepts(salient_points)
             
             # update SYSTEM based upon user needs and salience
@@ -289,17 +309,21 @@ class Muse(Chat):
                 .replace('<<CONCEPTS>>', concepts)
         
         self._messages[0]['content'] = system_prompt
+        print('SYSTEM PROMPT:\n' + system_prompt + '\n\n')
 
         # not a perfect calculation but close enough
         conversation_tokens = len(self._encoding.encode(stringify_conversation(self._messages + [{ 'role': 'user', 'content': msg }])))
         
         # reset conversation and save conversation
         if conversation_tokens + self._max_chat_length > self._max_tokens:
+            print('Reached maximum tokens, summarizing and resetting conversation...')
             self.save_messages()
             self._messages.clear()
+            self._total_tokens = 0
             self.add_message(system_prompt, 'system')
 
         # generate a response
+        print('Getting bot response...')
         msg_res = self.run()
 
         memory_embed = {
@@ -309,14 +333,22 @@ class Muse(Chat):
             'message': msg,
             'response': msg_res
         }
+        print('Getting embedding for message...')
         memory_embed['embedding'] = self.embedFactory.get_embedding(json.dumps(memory_embed))
         self.memory_data.append(memory_embed)
 
+        print('Updating concepts based on bot response...')
         concepts_to_add_or_update = self.concepts.update_concepts(salient_points, concepts, msg_res, msg)
+        print('\n\nNew or updated concepts:\n')
+        for c in concepts_to_add_or_update['add']:
+            print('Added concept: ' + c['data'])
+        for c in concepts_to_add_or_update['update']:
+            print('Updated concept: ' + c['data'])
         self.concept_data['add'] += concepts_to_add_or_update['add']
         self.concept_data['update'] += concepts_to_add_or_update['update']
 
-        return [anticipation, salient_points, msg_res]
+        print('Current tokens: ' + str(self._total_tokens))
+        return msg_res
     
     def reset(self):
         self.save_messages()
@@ -327,9 +359,13 @@ class Muse(Chat):
             return # bail if theres nothing to save
         print('Summarizing conversation...')
         summary = self._summaryFactory.summarize(self._messages)
-        self._messages[0] = self._default_system_msg + \
-            '\nI am continuing from a previous conversation, here is a summary of that conversation:\n' \
-            + summary
+        self._messages[0] = {
+            'role': 'system',
+            'content': self._default_system_msg + \
+                '\nI am continuing from a previous conversation, here is a summary of that conversation:\n' \
+                + summary
+        }
+        
         filename = 'chat_%s_user.txt' % t
         if not os.path.exists('chat_logs'):
             os.makedirs('chat_logs')
@@ -341,6 +377,8 @@ class Muse(Chat):
             os.makedirs('embeddings')
         emb_str = ''
         for emb in self.memory_data:
+            if emb == '':
+                continue
             emb_str += json.dumps(emb) + '\n'
         emb_str = emb_str[:len(emb_str)-1]
         filename = 'embedding_%s.jsonl' % t
@@ -348,7 +386,7 @@ class Muse(Chat):
 
     def _save_concepts(self):
         for c in self.concept_data['add']:
-            f_name = uuid.uuid1() + '.json'
+            f_name = str(uuid.uuid1()) + '.json'
             if not os.path.exists('concepts'):
                 os.makedirs('concepts')
             save_file('concepts/' + f_name, json.dumps(c))

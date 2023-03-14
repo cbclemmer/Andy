@@ -107,7 +107,5 @@ if __name__ == '__main__':
             print('Context:\n ' + msg)
             continue
         print('Sending message...')
-        [anticipation, salient_points, msg_res] = muse.send_chat(user_input)
-        print('\n\nANTICIPATION: %s' % anticipation)
-        print('\n\nSALIENCE: %s' % salient_points)
-        print('\n\nMUSE: %s' % msg_res)
+        msg_res = muse.send_chat(user_input)
+        print('\n\nMUSE:\n%s' % msg_res + '\n\n')
