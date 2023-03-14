@@ -261,8 +261,8 @@ class Muse(Chat):
             os.makedirs('embeddings')
         emb_str = ''
         for emb in self.embeddings:
-            emb_str += json.dumps(emb) + ',\n'
-        emb_str = emb_str[:len(emb_str)-2]
+            emb_str += json.dumps(emb) + '\n'
+        emb_str = emb_str[:len(emb_str)-1]
         filename = 'embedding_%s.jsonl' % t
         save_file('embeddings/%s' % filename, emb_str)
 
