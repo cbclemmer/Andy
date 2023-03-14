@@ -153,9 +153,6 @@ class Salience(GptCompletion):
             .replace('<<ANTICIPATION>>', anticipation)\
             .replace('<<MEMORIES>>', memories)
 
-        print('SAL')
-        print(prompt)
-        print('\nSAL')
         return self.complete(prompt, completion_config)
 
 class Memory(EmbeddingFactory):
@@ -178,6 +175,23 @@ class Memory(EmbeddingFactory):
                 most_similar = most_similar[:top_n]
         return most_similar
 
+class Summary(GptCompletion):
+    def __init__(self, api_key, org_key):
+        super().__init__(api_key, org_key, 'text-davinci-003')
+        self._summary_prompt = open_file('prompts/prompt_executive_summary.txt')
+        self.prompt_tokens = self._encoding.encode(self._summary_prompt)
+
+    def summarize(self, conversation):
+        conv_s = stringify_conversation(conversation)
+        prompt = self._summary_prompt.replace('<<INPUT>>', conv_s)
+        return self.complete(prompt, completion_config)
+
+
+# class Concept(EmbeddingFactory):
+#     def __init__(self, api_key, org_key):
+#         super().__init__(api_key, org_key)
+        
+
 class Muse(Chat):
     def __init__(self, api_key, org_key, max_tokens = 4096, max_chat_length = 512):
         super().__init__(api_key, org_key, 'gpt-3.5-turbo', {
@@ -187,6 +201,7 @@ class Muse(Chat):
         self._max_chat_length = max_chat_length
         self._anticipation = Anticipation(api_key, org_key)
         self._salience = Salience(api_key, org_key)
+        self._summaryFactory = Summary(api_key, org_key)
         self.embedFactory = EmbeddingFactory(api_key, org_key)
         self.memories = Memory(api_key, org_key)
         self.embeddings = []
@@ -251,6 +266,11 @@ class Muse(Chat):
         t = time()
         if len(self._messages) < 2:
             return # bail if theres nothing to save
+        print('Summarizing conversation...')
+        summary = self._summaryFactory.summarize(self._messages)
+        self._messages[0] = self._default_system_msg + \
+            '\nI am continuing from a previous conversation, here is a summary of that conversation:\n' \
+            + summary
         filename = 'chat_%s_user.txt' % t
         if not os.path.exists('chat_logs'):
             os.makedirs('chat_logs')
