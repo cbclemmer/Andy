@@ -1,0 +1,1 @@
+Add a LOAD_DIRECT command that will load everything from the previous conversation without starting a new message history

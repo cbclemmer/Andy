@@ -142,6 +142,8 @@ def get_closest_embeddings(folder, q_embed, top_n, exclude=[], exclude_key=None)
         if e_file_data == '':
             continue
         for line in e_file_data.split('\n'):
+            if len(line) == 0:
+                continue
             embed_obj = json.loads(line)
             if exclude_key is not None:
                 if embed_obj[exclude_key] in exclude:
@@ -195,6 +197,34 @@ class Memory(EmbeddingFactory):
         for o in most_similar:
             memories += '\n- ' + o[1]['salient_points']
         return memories
+    
+    def clean(self):
+        files = os.listdir('embeddings')
+        # max_sim = 0.975
+        max_sim = 0.99
+        for f in files:
+            full_path = 'embeddings/' + f
+            lines = open_file(full_path).split('\n')
+            idx = 0
+            lines_to_remove = [ ]
+            for line in lines:
+                obj = json.loads(line)
+                emb = obj['embedding']
+                closest = get_closest_embeddings('embeddings', emb, 2)
+                if len(closest) > 1 and closest[1][0] > max_sim:
+                    lines_to_remove.append(idx)
+                idx += 1
+            if len(lines_to_remove) > 0:
+                new_file = ''
+                idx = 0
+                for line in lines:
+                    if idx in lines_to_remove:
+                        continue
+                    new_file += line + '\n'
+                    idx += 1
+                os.remove(full_path)
+                if len(new_file) > 0:
+                    save_file(full_path, new_file)
 
 class Summary(GptCompletion):
     def __init__(self, api_key, org_key):
@@ -206,7 +236,6 @@ class Summary(GptCompletion):
         conv_s = stringify_conversation(conversation)
         prompt = self._summary_prompt.replace('<<INPUT>>', conv_s)
         return self.complete(prompt, completion_config)
-
 
 class Concept(GptCompletion):
     def __init__(self, api_key, org_key):
@@ -261,8 +290,8 @@ class Concept(GptCompletion):
         return {
             'data': concept,
             'embedding': c_embed
-        }   
-    
+        }
+
 class Muse(Chat):
     def __init__(self, api_key, org_key, max_tokens = 4096, max_chat_length = 512):
         super().__init__(api_key, org_key, 'gpt-3.5-turbo', {
@@ -358,6 +387,9 @@ class Muse(Chat):
         print('Current tokens: ' + str(self._total_tokens))
         return msg_res
     
+    def clean_memories(self):
+        self.memories.clean()
+    
     def reset(self):
         self.save_messages()
         self._messages[0] = self._default_system_msg
@@ -390,11 +422,13 @@ class Muse(Chat):
             emb_str += json.dumps(emb) + '\n'
         emb_str = emb_str[:len(emb_str)-1]
         filename = 'embedding_%s.jsonl' % t
+        if len(emb_str) == 0:
+            return
         save_file('embeddings/%s' % filename, emb_str)
 
     def _save_concepts(self):
         for c in self.concept_data['add']:
-            f_name = str(uuid.uuid1()) + '.json'
+            f_name = 'concept_' + str(uuid.uuid1()) + '.json'
             if not os.path.exists('concepts'):
                 os.makedirs('concepts')
             save_file('concepts/' + f_name, json.dumps(c))

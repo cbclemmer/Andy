@@ -106,6 +106,9 @@ if __name__ == '__main__':
             msg = muse.load()
             print('Context:\n ' + msg)
             continue
+        if user_input == 'CLEAN':
+            msg = muse.clean_memories()
+            continue
         print('Sending message...')
         msg_res = muse.send_chat(user_input)
         print('\n\nMUSE:\n%s' % msg_res + '\n\n')
