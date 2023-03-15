@@ -109,6 +109,11 @@ if __name__ == '__main__':
         if user_input == 'CLEAN':
             msg = muse.clean_memories()
             continue
+        if user_input == 'WRITE':
+            res = muse.write_document()
+            print('--------------------')
+            print(res)
+            continue
         print('Sending message...')
         msg_res = muse.send_chat(user_input)
         print('\n\nMUSE:\n%s' % msg_res + '\n\n')

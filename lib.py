@@ -38,6 +38,10 @@ class GptCompletion:
         # self.prompt_tokens += res.get('usage').get('prompt_tokens')
         # self.completion_tokens += res.get('usage').get('completion_tokens')
         # self.total_tokens += res.get('usage').get('total_tokens')
+        print('TOKENS')
+        print(res.get('usage').get('prompt_tokens'))
+        print(res.get('usage').get('completion_tokens'))
+        print(res.get('usage').get('total_tokens'))
         msg = res.get('choices')[0].get('text')
         return msg
 
@@ -118,7 +122,6 @@ class EmbeddingFactory:
             raise SyntaxError("Error getting embedding: " + res.get('error').get('message'))
         return res.get('data')[0].get('embedding')
 
-
 def open_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as infile:
         return infile.read()
@@ -134,7 +137,6 @@ def stringify_conversation(conversation):
     return convo.strip()
 
 def clean_embedding_folder(folder, max_sim):
-    print(folder)
     files = os.listdir(folder)
     rerun = False
     for f in files:
@@ -148,7 +150,6 @@ def clean_embedding_folder(folder, max_sim):
             obj = json.loads(line)
             emb = obj['embedding']
             closest = get_closest_embeddings(folder, emb, 2)
-            print(closest[1][0])
             if len(closest) > 1 and closest[1][0] > max_sim:
                 lines_to_remove.append(idx)
             idx += 1
@@ -298,6 +299,72 @@ class Concept(GptCompletion):
             'embedding': c_embed
         }
 
+class Write(GptCompletion):
+    def __init__(self, api_key, org_key):
+        super().__init__(api_key, org_key, 'text-davinci-003')
+        self.embedFactory = EmbeddingFactory(api_key, org_key)
+    
+    def write_document(self, last_memory):
+        prompt = open_file('prompts/prompt_write_query.txt')\
+            .replace('<<MEMORY>>', last_memory)
+        
+        queries = self.complete(prompt, completion_config)
+        queries = queries.split('\n')
+        def get_memories(q_list):
+            memories = [ ]
+            for q in q_list:
+                emb = self.embedFactory.get_embedding(q)
+                best_match = get_closest_embeddings('embeddings', emb, 1)
+                new_mem = best_match[0][1]['salient_points']
+                if new_mem in memories:
+                    continue
+                memories.append(new_mem)
+            
+            s_memories = ''
+            for m in memories:
+                s_memories += '- ' + m + '\n'
+            return s_memories
+
+        s_memories = get_memories(queries)
+        concept_files = os.listdir('concepts')
+        concepts = [ ]
+        for f in concept_files:
+            f_data = open_file('concepts/' + f)
+            if len(f_data) == 0:
+                continue
+            for line in f_data.split('\n'):
+                if len(line) == 0:
+                    continue
+                obj = json.loads(line)
+                concepts.append(obj['data'])
+
+        s_concepts = ''
+        for c in concepts:
+            s_concepts += '- ' + c + '\n'
+
+        prompt = open_file('prompts/prompt_write.txt')\
+            .replace('<<MEMORIES>>', s_memories)\
+            .replace('<<CONCEPTS>>', s_concepts)
+
+        document_beginning = self.complete(prompt, completion_config)
+        print(document_beginning)
+
+        prompt = open_file('prompts/prompt_write_memory.txt')\
+            .replace('<<MEMORIES>>', s_memories)\
+            .replace('<<DOCUMENT>>', document_beginning)
+        
+        new_memory_queries = self.complete(prompt, completion_config)
+        new_memories = get_memories(new_memory_queries.split('\n'))
+        prompt = open_file('prompts/prompt_write.txt')\
+            .replace('<<MEMORIES>>', new_memories)\
+            .replace('<<CONCEPTS>>', s_concepts)\
+            + '\n' + document_beginning
+        
+        document_chunk = self.complete(prompt, completion_config)
+        return document_chunk
+
+
+
 class Muse(Chat):
     def __init__(self, api_key, org_key, max_tokens = 4096, max_chat_length = 512):
         super().__init__(api_key, org_key, 'gpt-3.5-turbo', {
@@ -311,6 +378,7 @@ class Muse(Chat):
         self.embedFactory = EmbeddingFactory(api_key, org_key)
         self.memories = Memory(api_key, org_key)
         self.concepts = Concept(api_key, org_key)
+        self.write = Write(api_key, org_key)
         self.memory_data = []
         self.concept_data = {
             'add': [],
@@ -397,6 +465,9 @@ class Muse(Chat):
         clean_embedding_folder('embeddings', 0.99)
         clean_embedding_folder('concepts', 0.9)
     
+    def write_document(self):
+        return self.write.write_document(self._messages[0]['content'])
+
     def reset(self):
         self.save_messages()
         self._messages[0] = self._default_system_msg
@@ -448,6 +519,7 @@ class Muse(Chat):
         self._save_chat_log(t)
         self._save_embedding(t)
         self._save_concepts()
+        self.clean_memories()
 
     def load(self):
         if not os.path.exists('chat_logs'):

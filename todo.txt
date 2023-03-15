@@ -1,1 +1,13 @@
 Add a LOAD_DIRECT command that will load everything from the previous conversation without starting a new message history
+At the start of writing the document, ask gpt to come up with an outline of the document
+    When gpt thinks it's done ask it if it has satisfied this outline and continue writing if it has't
+When writing the document, ask gpt to determine if the memories associated with the memory queries actually answer it's questions
+    then use that data later to ask the user these questions so that the memories can be fetched when writing the document again
+After every chunk writing the document, ask gpt to determine how confident it is that it can finish the paper (may have something to do with how well its scoring the memories)
+    if the score is too low, stop writing
+When writitng the document occasionally ask gpt whether it's done writing
+
+
+I can ask the user to clarify something with the key word CLARIFY and then the query for the user.
+I can try to remember a memory of a conversation with the user with the key word MEMORY and then the query to remember a conversation with the user.
+I can also try to remember a concept of a conversation with the user with the key word CONCEPT and then the query to remember the concept that the user has told me.
