@@ -1,4 +1,5 @@
-from lib import Andy, open_file
+from src.andy import Andy
+from src.util import open_file
 import signal
 
 convo_length = 30
