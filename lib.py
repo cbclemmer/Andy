@@ -365,7 +365,7 @@ class Write(GptCompletion):
 
 
 
-class Muse(Chat):
+class Andy(Chat):
     def __init__(self, api_key, org_key, max_tokens = 4096, max_chat_length = 512):
         super().__init__(api_key, org_key, 'gpt-3.5-turbo', {
             "max_tokens": max_chat_length
