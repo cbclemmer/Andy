@@ -1,12 +1,11 @@
 import os
-from gpt import Chat
 from util import open_file, stringify_conversation, clean_embedding_folder, save_file
 from brain.anticipation import Anticipation
 from brain.salience import Salience
 from brain.memory import Memory
 from brain.concept import Concept
 from summary import Summary
-from gpt import EmbeddingFactory
+from gpt import EmbeddingFactory, Chat
 from write import Write
 import uuid
 import json
