@@ -12,3 +12,5 @@ Scratch pad:
 I can ask the user to clarify something with the key word CLARIFY and then the query for the user.
 I can try to remember a memory of a conversation with the user with the key word MEMORY and then the query to remember a conversation with the user.
 I can also try to remember a concept of a conversation with the user with the key word CONCEPT and then the query to remember the concept that the user has told me.
+
+Local Vector DB: https://github.com/chroma-core/chroma
